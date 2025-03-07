@@ -97,6 +97,11 @@ base1 <- base %>%
                              "38" = "San Nicolás – Villa Constitución", 
                              "91" = "Rawson – Trelew", 
                              "93"="Viedma – Carmen de Patagones"))
+```
+
+```{r}
+base1 <- base1 %>% 
+  rename(SEXO= CH04)
 
 ```
 
@@ -122,4 +127,57 @@ tasas_aglomerados <- base1 %>%
   ungroup() %>%  #Desagrupo el data.frame para poder seguir operando tranquilo sobre el mismo
   select(-(2:9)) # Elimino los niveles poblacionales (ahora tengo como 1er variable el aglomerado)
 kable(tasas_aglomerados, format = "markdown")
+```
+
+Vamos ahora a realizar unas recodificación de variables asignandole nombres para una mejor visualización
+
+```{r}
+# Tasas Básicas por Aglomerados por sexo total eph 
+base1 <- base1 %>% mutate(SEXO = recode(SEXO,
+                             "1" = "Varón",
+                             "2" = "Mujer"))
+tasas_aglomerados <- base1 %>% 
+  group_by(SEXO) %>% 
+  summarise(Poblacion         = sum(PONDERA),
+            Ocupados          = sum(PONDERA[ESTADO == 1]),
+            Desocupados       = sum(PONDERA[ESTADO == 2]),
+            PEA               = Ocupados + Desocupados,
+            Ocupados_demand   = sum(PONDERA[ESTADO == 1 & PP03J == 1]),
+            Suboc_demandante  = sum(PONDERA[ESTADO == 1 & INTENSI == 1 & PP03J == 1]),
+            Suboc_no_demand   = sum(PONDERA[ESTADO == 1 & INTENSI == 1 & PP03J %in% c(2, 9)]),
+            Subocupados       = Suboc_demandante + Suboc_no_demand,
+            'Tasa Actividad'                  = PEA/Poblacion,
+            'Tasa Empleo'                     = Ocupados/Poblacion,
+            'Tasa Desocupacion'               = Desocupados/PEA,
+            'Tasa ocupados demandantes'       = Ocupados_demand/PEA,
+            'Tasa Subocupación'               = Subocupados/PEA,
+            'Tasa Subocupación demandante'    = Suboc_demandante/PEA,
+            'Tasa Subocupación no demandante' = Suboc_no_demand/PEA)%>% 
+  ungroup() %>%  #Desagrupo el data.frame para poder seguir operando tranquilo sobre el mismo
+  select(-(2:9)) # Elimino los niveles poblacionales (ahora tengo como 1er variable el aglomerado)
+kable(tasas_aglomerados, format = "markdown")
+```
+
+Ahora vamos a definir grupos de edades para poder ver el grado de edades
+
+```{r}
+base1 <- base1 %>% 
+  mutate(Grupos_Etarios = case_when(EDAD  < 18   ~ "Menores",
+                                 EDAD  %in%  18:65   ~ "Adultos",
+                                 EDAD  > 65 ~ "Adultos Mayores"))
+```
+
+ver resultado
+
+```{r}
+base1 %>% 
+  select(AGLOMERADO,SEXO,EDAD,Grupos_Etarios)
+```
+
+Vamos a construir tipo de precariedad en base a algunos indicadores, el primero será la faltad e aporte patronal para eso procesamos el siguiente código
+
+#final del cuento
+
+```{r eval=FALSE, include=FALSE}
+openxlsx::write.xlsx(x = "Resultados/exportacion.xlsx")
 ```
