@@ -5,7 +5,7 @@ output:
     df_print: paged
 ---
 
-abrimos librerias necesarias para hacer el tp
+Abrimos librerias necesarias para hacer el trabajo Final
 
 ```{r message=FALSE, warning=FALSE}
 library(tidyverse)
@@ -15,11 +15,13 @@ library(scales)
 library(ggplot2)
 library(dplyr)
 library(knitr)
+library(ggthemes)
+library(kableExtra) 
 ```
 
 Importar base de datos
 
-```{r message=FALSE, warning=FALSE}
+```{r message=FALSE, warning=FALSE, include=FALSE}
 base <- eph::get_microdata(2024,3)
 ```
 
@@ -27,13 +29,14 @@ base <- eph::get_microdata(2024,3)
 list.files("Fuentes/")
 ```
 
-```{r}
+```{r include=FALSE}
 Aglom <- openxlsx::read.xlsx("Fuentes/Aglomerados EPH.xlsx")
+regiones <- openxlsx::read.xlsx("Fuentes/Aglomerados y Regiones EPH.xlsx")
 ```
 
 Vamos a calcular algunas estadísticas básicas de la base EPH INDEC tercer trimestre de 2024- para ello esamos el siguiente código
 
-```{r}
+```{r include=FALSE}
 Tasas <- base %>% 
   summarise(Poblacion         = sum(PONDERA),
             Ocupados          = sum(PONDERA[ESTADO == 1]),
@@ -56,8 +59,9 @@ Tasas <- base %>%
 
 Vamos a mostrar los resultados
 
-```{r}
-kable(Tasas, format = "markdown")  
+```{r echo=TRUE}
+kable(Tasas, format = "markdown")
+
 ```
 
 Vamos a calcular las tasas por Aglomerado
@@ -100,6 +104,14 @@ base1 <- base %>%
 ```
 
 ```{r}
+base1 <- base1 %>%
+  mutate(REGION = recode(REGION,
+                        "1"= "GBA", "43"="Pampeana",
+                        "40"="Noroeste", "41"="Noreste", 
+                        "42"="Cuyo", "44"="Patagonia"))
+```
+
+```{r}
 base1 <- base1 %>% 
   rename(SEXO= CH04)
 
@@ -129,14 +141,40 @@ tasas_aglomerados <- base1 %>%
 kable(tasas_aglomerados, format = "markdown")
 ```
 
-Vamos ahora a realizar unas recodificación de variables asignandole nombres para una mejor visualización
+Vemos ahora las Tasas por Regiones
+
+```{r}
+# Tasas Básicas por Regiones
+tasas_regiones <- base1 %>% 
+  group_by(REGION) %>% 
+  summarise(Poblacion         = sum(PONDERA),
+            Ocupados          = sum(PONDERA[ESTADO == 1]),
+            Desocupados       = sum(PONDERA[ESTADO == 2]),
+            PEA               = Ocupados + Desocupados,
+            Ocupados_demand   = sum(PONDERA[ESTADO == 1 & PP03J == 1]),
+            Suboc_demandante  = sum(PONDERA[ESTADO == 1 & INTENSI == 1 & PP03J == 1]),
+            Suboc_no_demand   = sum(PONDERA[ESTADO == 1 & INTENSI == 1 & PP03J %in% c(2, 9)]),
+            Subocupados       = Suboc_demandante + Suboc_no_demand,
+            'Tasa Actividad'                  = PEA/Poblacion,
+            'Tasa Empleo'                     = Ocupados/Poblacion,
+            'Tasa Desocupacion'               = Desocupados/PEA,
+            'Tasa ocupados demandantes'       = Ocupados_demand/PEA,
+            'Tasa Subocupación'               = Subocupados/PEA,
+            'Tasa Subocupación demandante'    = Suboc_demandante/PEA,
+            'Tasa Subocupación no demandante' = Suboc_no_demand/PEA)%>% 
+  ungroup() %>%  #Desagrupo el data.frame para poder seguir operando tranquilo sobre el mismo
+  select(-(2:9)) # Elimino los niveles poblacionales (ahora tengo como 1er variable el aglomerado)
+kable(tasas_regiones, format = "markdown")
+```
+
+Vemos ahora las Tasas por Sexo
 
 ```{r}
 # Tasas Básicas por Aglomerados por sexo total eph 
 base1 <- base1 %>% mutate(SEXO = recode(SEXO,
                              "1" = "Varón",
                              "2" = "Mujer"))
-tasas_aglomerados <- base1 %>% 
+tasas_sexo <- base1 %>% 
   group_by(SEXO) %>% 
   summarise(Poblacion         = sum(PONDERA),
             Ocupados          = sum(PONDERA[ESTADO == 1]),
@@ -155,29 +193,181 @@ tasas_aglomerados <- base1 %>%
             'Tasa Subocupación no demandante' = Suboc_no_demand/PEA)%>% 
   ungroup() %>%  #Desagrupo el data.frame para poder seguir operando tranquilo sobre el mismo
   select(-(2:9)) # Elimino los niveles poblacionales (ahora tengo como 1er variable el aglomerado)
-kable(tasas_aglomerados, format = "markdown")
+kable(tasas_sexo, format = "markdown")
 ```
 
 Ahora vamos a definir grupos de edades para poder ver el grado de edades
 
 ```{r}
 base1 <- base1 %>% 
-  mutate(Grupos_Etarios = case_when(EDAD  < 18   ~ "Menores",
-                                 EDAD  %in%  18:65   ~ "Adultos",
-                                 EDAD  > 65 ~ "Adultos Mayores"))
+  rename(EDAD= CH06)
+
 ```
 
-ver resultado
+```{r}
+base1 <- base1 %>% mutate(Grupos_Etarios = case_when("EDAD"  < 18   ~ "Menores",
+                                 "EDAD"  %in%  18:65   ~ "Adultos",
+                                 "EDAD"  > 65 ~ "Adultos Mayores"))
+```
 
 ```{r}
 base1 %>% 
-  select(AGLOMERADO,SEXO,EDAD,Grupos_Etarios)
+  select(AGLOMERADO,SEXO,EDAD,Grupos_Etarios,REGION)
 ```
 
 Vamos a construir tipo de precariedad en base a algunos indicadores, el primero será la faltad e aporte patronal para eso procesamos el siguiente código
 
-#final del cuento
-
-```{r eval=FALSE, include=FALSE}
-openxlsx::write.xlsx(x = "Resultados/exportacion.xlsx")
+```{r}
+base_asal <- base1 %>% 
+  filter(ESTADO == 1, CAT_OCUP == 3, P21>0) %>% 
+  mutate(PONDIIO = as.numeric(PONDIIO),
+         condicion = ifelse(PP07H == 1,"Registrados","No Registrados"))
 ```
+
+```{r}
+salarios_s_reg<- base_asal %>% 
+  group_by(condicion) %>% 
+  summarise(ing_prom = weighted.mean(P21,PONDIIO,na.rm = T))
+```
+
+Graficar
+
+```{r}
+ggplot(salarios_s_reg,aes(x = condicion, y = ing_prom,fill = condicion))+
+  geom_col()+
+  theme(legend.position = "none")+
+  labs(y = "Ingreso Promedio en $")
+```
+
+Graficar Asalariados Con o sin descuento jubilatorio por Edades
+
+```{r}
+ggplot(base_asal,aes(x = condicion, y = EDAD,fill = condicion))+
+  geom_boxplot()+
+  theme(legend.position = "none")+
+  labs(y = "Edades")
+```
+
+Ahora vamos a crear una variable para ver nivel educatico
+
+```{r}
+base_asal_preca <- base1 %>%
+  filter(ESTADO == 1, CAT_OCUP == 3) %>% # Ocupados asalariados
+  mutate(
+    nivel.ed = factor(
+      case_when(NIVEL_ED %in% c(7,1,2,3) ~ "Menor a Secundaria",
+                NIVEL_ED %in% c(4,5) ~ "Secundaria Completa",
+                NIVEL_ED == 6 ~ "Superior Completo",
+                TRUE ~ "Ns/Nr"),
+      levels = c("Menor a Secundaria","Secundaria Completa","Superior Completo")),
+    tamanio.establec = factor(
+      case_when(PP04C %in% 1:6  ~ "Pequeño",
+                PP04C %in% 7:8  ~ "Mediano",
+                PP04C %in% 9:12 ~ "Grande",
+                PP04C %in% 99   ~ "Ns/Nr"),
+      levels = c("Pequeño","Mediano","Grande","Ns/Nr")),
+    descuento_jubil = case_when(PP07H == 1 ~ "Si",
+                                PP07H == 2 ~ "No"),
+    part.time.inv = case_when(PP3E_TOT < 35 & PP03G == 1 ~ "Si",
+                             TRUE ~ "No"),
+    tiempo.determinado = case_when(PP07C ==  1 ~ "Si",
+                                   TRUE ~ "No"))
+
+```
+
+La función **calculate_tabulates** nos parmite rápidamente obtener tabulados univariados y bivariados de nuestras categorías de interés. Criterio descuento jubilatorio
+
+```{r}
+calculate_tabulates(base = base_asal_preca,
+                         x = "descuento_jubil",
+                         weights = "PONDERA")
+```
+
+Criterio Nivel Educativo
+
+```{r}
+calculate_tabulates(base = base_asal_preca,
+                         x = "descuento_jubil",
+                         y = "nivel.ed",
+                         add.totals = "both",
+                         weights = "PONDERA")
+
+```
+
+En porcentajes
+
+```{r}
+calculate_tabulates(base = base_asal_preca,
+                         x = "descuento_jubil",
+                         y = "nivel.ed",
+                         add.percentage = "col", 
+                         weights = "PONDERA")
+```
+
+Tercer criterio tamaño establecimiento
+
+```{r}
+calculate_tabulates(base = base_asal_preca,
+                         x = "descuento_jubil",
+                         y = "tamanio.establec",
+                         add.percentage = "col", 
+                         weights = "PONDERA")
+```
+
+Cuarto factor trabajo tiempo parcial
+
+```{r}
+calculate_tabulates(base = base_asal_preca,
+                         x = "descuento_jubil",
+                         y = "part.time.inv",
+                         add.percentage = "col", 
+                         weights = "PONDERA")
+```
+
+En base a eso definimos la precariedad en tres factores, que no posea descuento jubilatorio o que trabaje part time o trabajo por tiempo determinado.
+
+```{r}
+precarizados <- base_asal_preca %>% 
+  mutate(signos.precariedad = ifelse(descuento_jubil == "No",yes = 1,no = 0)+
+                              ifelse(part.time.inv == "Si",yes = 1,no = 0)+
+                              ifelse(tiempo.determinado == "Si",yes = 1,no = 0))
+```
+
+```{r}
+precarizados1 <- precarizados %>%   
+  mutate(Grado.prec = factor(  
+    case_when(  
+      signos.precariedad == 0 ~ "Sin precarizar",  
+      signos.precariedad == 1 ~ "Leve",  
+      signos.precariedad == 2 ~ "Moderado",  
+      signos.precariedad == 3 ~ "Severo",  
+      TRUE ~ NA_character_  # Para manejar cualquier otro caso que no sea 0, 1, 2 o 3  
+    )  
+  ))  
+```
+
+```{r}
+precarizados1 %>%  
+    group_by(Grado.prec) %>% 
+  summarise(Poblacion = sum(PONDERA))
+```
+
+```{r}
+calculate_tabulates(base = precarizados1,
+                         x = "SEXO",
+                         y = "Grado.prec",                         add.percentage = "col",                          weights = "PONDERA")
+```
+
+```{r}
+calculate_tabulates(base = precarizados1,
+                         x = "REGION",
+                         y = "Grado.prec",                         add.percentage = "col",                          weights = "PONDERA")
+```
+
+```{r}
+calculate_tabulates(base = precarizados1,
+                         y = "Grado.prec",
+                         x = "nivel.ed",                         add.percentage = "col",                          weights = "PONDERA")
+```
+
+\`\`\` Bueno podría realizarse alguna grafica
