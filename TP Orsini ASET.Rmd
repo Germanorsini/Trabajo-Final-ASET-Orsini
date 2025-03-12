@@ -205,9 +205,11 @@ base1 <- base1 %>%
 ```
 
 ```{r}
-base1 <- base1 %>% mutate(Grupos_Etarios = case_when("EDAD"  < 18   ~ "Menores",
-                                 "EDAD"  %in%  18:65   ~ "Adultos",
-                                 "EDAD"  > 65 ~ "Adultos Mayores"))
+base1 <- base1 %>% mutate(Grupos_Etarios = case_when(
+  EDAD < 18 ~ "Menores",
+  EDAD >= 18 & EDAD <= 65 ~ "Adultos",
+  EDAD > 65 ~ "Adultos Mayores"
+))
 ```
 
 ```{r}
